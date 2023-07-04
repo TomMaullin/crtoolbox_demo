@@ -2,7 +2,7 @@
 # ----------------------------------------------------------------------------------------------
 # As a sanity check, we can assess the coverage of our confidence regions by using the `check_violations` function.
 # ----------------------------------------------------------------------------------------------
-# Set the number of repetitions (to begin this is set to 1)
+# Set the number of repetitions (to begin this is set to 1000)
 nReps = 1000
 
 # Get the number of observations
