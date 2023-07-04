@@ -43,3 +43,8 @@ for j in np.arange(nReps):
         print('current avg: ', avg_results[0])
 
 
+# ----------------------------------------------------------------------------------------------
+# > **Test your understanding:** Try running the above with a few different signals and noise
+# settings. Which factors (e.g. noise magnitude, sample size, smoothness) cause the observed
+# coverage to differ from $1-\alpha$? Why do you think this is?
+# ----------------------------------------------------------------------------------------------
