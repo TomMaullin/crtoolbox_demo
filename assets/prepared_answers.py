@@ -42,7 +42,7 @@ my_signal = CircleSignal(r=20, mag=3)
 # Let's perform a regression to get the images we need. You can use the same `regression`
 # function as in the 2D example to perform this step.
 # ----------------------------------------------------------------------------------------------
-betahat_files, std_beta_files, resid_files = regression(y_files, X, out_dir)
+betahat_files, sigma_file, resid_files = regression(y_files, X, out_dir)
 
 
 
