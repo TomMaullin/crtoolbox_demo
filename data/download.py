@@ -1,39 +1,101 @@
-import requests
-import zipfile
-import pandas as pd
-import glob
 import os
+import gzip
+import shutil
+import requests
+import warnings
+import pandas as pd
+from nilearn.datasets import fetch_neurovault
 
-def download_and_extract_zip_from_dropbox(local_path):
+def download_5802_contrasts(n=5, contrasts=None, data_dir=None):
 
-    url = 'https://www.dropbox.com/s/ukpxm38n0tzbw5q/HCP_U77_WM.zip?dl=1'
+    # Print warning if n too high
+    if n > 179:
+        print('Warning: Data only available for 179 subjects!')
+        
+    # Load in the collection
+    collection_id = 5802
+    url = f"https://neurovault.org/api/collections/{collection_id}/images/?format=json"
+    
+    # Get the collection metadata
+    all_images = []
+    while url:
+        response = requests.get(url)
+        data = response.json()
+        all_images.extend(data['results'])
+        url = data['next']  # Follow pagination
+    
+    # Convert to pandas dataframe
+    meta_df = pd.DataFrame(all_images)
+    
+    # Drop subject with corrupted contrast
+    meta_df = meta_df[meta_df['id'] != 135107].reset_index(drop=True)
+    
+    # Check if we have been given any contrasts
+    if contrasts is None:
+        contrasts = [
+            'Faces NimStim Faces vs Shapes',
+            'IAPS LookNeg vs LookNeut'
+        ]
 
-    # Download the zip file from Dropbox
-    response = requests.get(url, allow_redirects=True)
+    # Extract subject ID and contrast name
+    meta_df = meta_df.copy()
+    meta_df['subject'] = meta_df['name'].str.extract(r'^Subject (\d{3})')[0]
+    meta_df['contrast'] = meta_df['name'].str.extract(r'^Subject \d{3} (.+)$')[0]
 
-    # Save the zip file
-    zip_file_path = local_path + '.zip'
+    # Find subjects with both contrasts
+    grouped = meta_df.groupby('subject')['contrast'].apply(set)
+    eligible_subjects = grouped[grouped.apply(lambda s: set(contrasts).issubset(s))].index[:n]
 
-    # Write the zip file to the local path
-    open(zip_file_path, 'wb').write(response.content)
+    # Define image filter for nilearn
+    def image_filter(im):
+        name = im.get('name', '')
+        return any(
+            name.startswith(f"Subject {subj} {contrast}")
+            for subj in eligible_subjects
+            for contrast in contrasts
+        )
 
-    # Extract the zip file
-    with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-        zip_ref.extractall(local_path)
+    print(f"Downloading for subjects: {list(eligible_subjects)}")
 
-    # Remove the zip file
-    os.remove(zip_file_path)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="You specified a value for `image_filter` but the default filters in `image_terms` still apply.",
+            category=UserWarning
+        )
+        nv = fetch_neurovault(
+            collection_id=5802,
+            image_filter=image_filter,
+            data_dir=data_dir,
+            max_images=None
+        )
 
-    # List all nifti files in the directory
-    bold_files = glob.glob(os.path.join(local_path,'HCP_U77_WM','*.nii.gz'))
+    # Make directory if needed
+    os.makedirs(data_dir, exist_ok=True)
 
-    # Now sort the bold files
-    bold_files = sorted(bold_files, key=lambda name: int(os.path.basename(name).split('_')[0]))
+    # Empty list for output files
+    out_files = []
 
-    # Read in the covariate data
-    covariates = pd.read_csv(os.path.join(local_path,'HCP_U77_WM','behavioural_data_subset_77.csv'))
+    # Extract and rename .nii.gz files into data_dir
+    for gz_path, meta in zip(nv['images'], nv['images_meta']):
+        cleaned_name = meta['name'].replace(" ", "-") + ".nii"
+        output_path = os.path.join(data_dir, cleaned_name)
 
-    # Sort dataframe by 'Subject'
-    covariates = covariates.sort_values(by='Subject')
+        with gzip.open(gz_path, 'rb') as f_in, open(output_path, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
 
-    return(bold_files, covariates)
+        print(f"Extracted and saved: {cleaned_name}")
+
+        out_files = out_files + [output_path,]
+
+    # Remove temporary directory
+    shutil.rmtree(os.path.join(data_dir,'neurovault'))
+
+    # Split into two contrasts
+    data_files = {}
+    
+    # Get data for first contrast
+    for j in range(len(contrasts)):
+        data_files[j] = [out_files[i] for i in range(len(out_files)) if contrasts[j].replace(' ','-') in out_files[i]]
+
+    return data_files

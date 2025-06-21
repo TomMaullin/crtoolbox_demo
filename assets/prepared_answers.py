@@ -60,45 +60,39 @@ display_crs(estimated_ac_file, upper_cr_file, lower_cr_file, mask_file)
 # ----------------------------------------------------------------------------------------------
 # **The Challenge**
 #
-# Your challenge is to fit a regression model to this data and generate confidence regions. Try
-# the following model, generate CRs, and see if you can determine which regions of activation
-# you have high confidence in.
-#
-# $$\text{COPE}(s) = \beta_0 + \text{Sex} \beta_1 + \text{Age} \beta_2 + \text{PMAT24\_A\_CR} 
-# \beta_3 + \text{PSQI\_SCORE} \beta_4$$
-#
+# In this section, your challenge is to fit a simple OLS regression model to this data and generate confidence regions. Try the following model, generate CRs, and see if you can determine which regions of activation you have high confidence in.
+
+# \begin{equation}\nonumber
+# \text{COPE}(s) = \beta_0(s) + \epsilon(s).
+# \end{equation}
+
 # If you have any questions, or are unsure how to do this, please feel free to ask.
 # ----------------------------------------------------------------------------------------------
 
-# First, insert the new column of ones at position 0
-if 'Intercept' not in covariates.columns:
-    covariates.insert(0, 'Intercept', 1)
+# Construct X
+X = np.ones((n_samples,1))
 
-# Convert the DataFrame to a numpy array
-X = covariates.drop('Subject', axis=1).values
-
-# Output directory (feel free to change this to your desired output directory)
-out_dir = os.path.join(real_data_dir, 'results')
-if not os.path.exists(out_dir):
-    os.mkdir(out_dir)
-
-# Fit the regression model
-betahat_files, sigma_file, resid_files = regression(bold_files, X, out_dir, chunk_size=5)
-
-# We'll add a mask as a background to help visualise the data
-mask_file = os.path.join(os.getcwd(),'data','mask.nii.gz')
-
-# Threshold c
-c = 20
+# Perform regression
+out_dir = os.path.join(os.getcwd(),'data','example_real_data')
+betahat_files, sigma_file, resid_files = regression(y_files, X, out_dir)
 
 # Decide a confidence level alpha
 alpha = 0.05
 
-# Compute confidence regions
-lower_cr_file, upper_cr_file, estimated_ac_file, quantile_estimate = generate_CRs(betahat_files[0], sigma_file, resid_files, out_dir, c, 1-alpha, n_boot=2000)
+# To save time, we suggest using 2000 bootstrap iterations at first
+n_boot = 2000
 
-# Display the crs
-display_crs(estimated_ac_file, upper_cr_file, lower_cr_file, mask)
+# Threshold c
+c = 5
+
+# Generate confidence regions
+upper_cr_file, lower_cr_file, estimated_ac_file, quantile_estimate = generate_CRs(betahat_files, sigma_file, resid_files, out_dir, c, 1-alpha, n_boot=n_boot)
+
+# Obtain mask
+mask_file = os.path.join(os.getcwd(),'data','example_real_data','mask.nii')
+
+# Display CRs
+display_crs(estimated_ac_file, upper_cr_file, lower_cr_file, mask_file)
 
 # Remove files
-remove_files(bold_files, resid_files, betahat_files, sigma_file, lower_cr_file, upper_cr_file, estimated_ac_file)
+remove_files(y_files, resid_files, betahat_files, sigma_file, lower_cr_file, upper_cr_file, estimated_ac_file)
