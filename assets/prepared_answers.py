@@ -8,14 +8,14 @@
 # ----------------------------------------------------------------------------------------------
 
 # Load in pre-computed confidence regions.
-Upper_CR_fname = os.path.join(os.getcwd(),'demo','data','example2','Upper_CR_Example2.nii.gz')
-Lower_CR_fname = os.path.join(os.getcwd(),'demo','data','example2','Lower_CR_Example2.nii.gz')
+Upper_CR_fname = os.path.join(os.getcwd(),'data','example2','Upper_CR_Example2.nii.gz')
+Lower_CR_fname = os.path.join(os.getcwd(),'data','example2','Lower_CR_Example2.nii.gz')
 
 # Load in a pre-computed point estimate of Ac.
-estimated_Ac_fname = os.path.join(os.getcwd(),'demo','data','example2','Estimated_Ac_Example2.nii.gz')
+estimated_Ac_fname = os.path.join(os.getcwd(),'data','example2','Estimated_Ac_Example2.nii.gz')
 
 # Load in a pre-computed mask.
-mask_fname = os.path.join(os.getcwd(),'demo','data','mask.nii.gz')
+mask_fname = os.path.join(os.getcwd(),'data','mask.nii.gz')
 
 # Display confidence regions in interactive slice plot.
 display_crs(estimated_Ac_fname, Upper_CR_fname, Lower_CR_fname, mask_fname, mode='Sagittal')
@@ -24,12 +24,10 @@ display_crs(estimated_Ac_fname, Upper_CR_fname, Lower_CR_fname, mask_fname, mode
 
 
 
-
-
 # ----------------------------------------------------------------------------------------------
 # Choose your noise and signal
 # ----------------------------------------------------------------------------------------------
-my_noise = Noise(var=8)
+my_noise = Noise(var=2)
 my_signal = CircleSignal(r=20, mag=3)
 
 
@@ -42,8 +40,12 @@ my_signal = CircleSignal(r=20, mag=3)
 # Let's perform a regression to get the images we need. You can use the same `regression`
 # function as in the 2D example to perform this step.
 # ----------------------------------------------------------------------------------------------
-betahat_files, sigma_file, resid_files = regression(y_files, X, out_dir)
 
+# Contrast vector
+L = np.array([[1,1,0]]).T
+
+# Fit the regression model
+contrast_file, betahat_files, sigma_file, resid_files, mask_file = regression(y_files, X, out_dir, L)
 
 
 
@@ -56,11 +58,10 @@ display_crs(estimated_ac_file, upper_cr_file, lower_cr_file, mask_file)
 
 
 
-
 # ----------------------------------------------------------------------------------------------
-# **The Challenge**
-#
-# In this section, your challenge is to fit a simple OLS regression model to this data and generate confidence regions. Try the following model, generate CRs, and see if you can determine which regions of activation you have high confidence in.
+# **The Analysis**
+
+# Our aim is now to investigate the reliability in the group-average activation for the calculation task. In this section, your challenge is to fit a simple OLS regression model to this data and generate confidence regions. Try the following model, generate CRs, and see if you can determine which regions of activation you have high confidence in.
 
 # \begin{equation}\nonumber
 # \text{COPE}(s) = \beta_0(s) + \epsilon(s).
@@ -69,12 +70,15 @@ display_crs(estimated_ac_file, upper_cr_file, lower_cr_file, mask_file)
 # If you have any questions, or are unsure how to do this, please feel free to ask.
 # ----------------------------------------------------------------------------------------------
 
+
+
 # Construct X
+n_samples = len(y_files)
 X = np.ones((n_samples,1))
 
 # Perform regression
 out_dir = os.path.join(os.getcwd(),'data','example_real_data')
-betahat_files, sigma_file, resid_files = regression(y_files, X, out_dir)
+contrast_file, betahat_files, sigma_file, resid_files, mask_file = regression(y_files, X, out_dir)
 
 # Decide a confidence level alpha
 alpha = 0.05
@@ -86,13 +90,12 @@ n_boot = 2000
 c = 5
 
 # Generate confidence regions
-upper_cr_file, lower_cr_file, estimated_ac_file, quantile_estimate = generate_CRs(betahat_files, sigma_file, resid_files, out_dir, c, 1-alpha, n_boot=n_boot)
-
-# Obtain mask
-mask_file = os.path.join(os.getcwd(),'data','example_real_data','mask.nii')
+upper_cr_file, lower_cr_file, estimated_ac_file, quantile_estimate = generate_CRs(contrast_file, sigma_file, resid_files, out_dir, c, 1-alpha, n_boot=n_boot)
 
 # Display CRs
 display_crs(estimated_ac_file, upper_cr_file, lower_cr_file, mask_file)
 
 # Remove files
-remove_files(y_files, resid_files, betahat_files, sigma_file, lower_cr_file, upper_cr_file, estimated_ac_file)
+for files in [y_files, resid_files, contrast_file, betahat_files, 
+              sigma_file, lower_cr_file, upper_cr_file, estimated_ac_file, mask_file]:
+    remove_files(files)
