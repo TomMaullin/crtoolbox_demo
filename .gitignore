@@ -1,4 +1,5 @@
 .ipynb_checkpoints/
+.virtual_documents/
 data/__pycache__/
 data/example_real_data/
-.virtual_documents/
+data/example_real_data_conjunctions/
